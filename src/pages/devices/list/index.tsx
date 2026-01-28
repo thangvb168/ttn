@@ -18,7 +18,9 @@ import {
 } from "@ant-design/pro-components";
 import { Button, Dropdown, Input, Segmented, Tag } from "antd";
 import React, { useEffect, useRef, useState } from "react";
+import { FormDevice } from "./components/FormDevice";
 import { UnitTree } from "./components/UnitTree";
+import { DeviceFormValues } from "./schema/device";
 import { queryDevices } from "./service";
 
 // Basic useDebounce hook implementation inside the file or imported.
@@ -39,10 +41,53 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const ListDevicePage: React.FC = () => {
   const actionRef = useRef<ActionType>(null);
+  const [selectedUnitIds, setSelectedUnitIds] = useState<React.Key[]>([]);
+  const [data, setData] = useState<Device[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [current, setCurrent] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [keyword, setKeyword] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentRow, setCurrentRow] = useState<Device | undefined>(undefined);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Handlers
+  const handleAdd = () => {
+    setCurrentRow(undefined);
+    setModalOpen(true);
+  };
+
+  const handleEdit = (record: Device) => {
+    setCurrentRow(record);
+    setModalOpen(true);
+  };
+
+  const handleDelete = (record: Device) => {
+    // Simulate delete
+    console.log("Delete", record);
+  };
+
+  const handleSubmitForm = async (values: DeviceFormValues) => {
+    setSubmitting(true);
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Form Submitted:", values);
+      setModalOpen(false);
+      // Reload logic would go here
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // ... columns ...
   const columns: ProColumns<Device>[] = [
-    // ... (keep columns same)
     {
       title: "STT",
       dataIndex: "index",
@@ -128,12 +173,14 @@ const ListDevicePage: React.FC = () => {
                   key: "edit",
                   label: "Chỉnh sửa",
                   icon: <EditOutlined />,
+                  onClick: () => handleEdit(record),
                 },
                 {
                   key: "delete",
                   label: "Xóa",
                   icon: <DeleteOutlined />,
                   danger: true,
+                  onClick: () => handleDelete(record),
                 },
               ],
             }}
@@ -145,15 +192,6 @@ const ListDevicePage: React.FC = () => {
       fixed: "right",
     },
   ];
-
-  const [selectedUnitIds, setSelectedUnitIds] = useState<React.Key[]>([]);
-  const [data, setData] = useState<Device[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
-  const [current, setCurrent] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [keyword, setKeyword] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Use debounced keyword for fetching
   const debouncedKeyword = useDebounce(keyword, 500);
@@ -228,7 +266,12 @@ const ListDevicePage: React.FC = () => {
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value as string)}
               />,
-              <Button type="primary" key="primary" icon={<PlusOutlined />}>
+              <Button
+                type="primary"
+                key="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAdd}
+              >
                 Thêm thiết bị
               </Button>,
             ]}
@@ -251,6 +294,13 @@ const ListDevicePage: React.FC = () => {
                 setPageSize(pageSize);
               },
             }}
+          />
+          <FormDevice
+            open={modalOpen}
+            onCancel={() => setModalOpen(false)}
+            onSubmit={handleSubmitForm}
+            initialValues={currentRow}
+            loading={submitting}
           />
         </div>
       </div>

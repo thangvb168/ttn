@@ -9,6 +9,7 @@ export const buildTree = (units: Unit[]): DataNode[] => {
   for (const unit of units) {
     nodeMap.set(unit.id, {
       key: unit.id,
+      value: unit.id, // Compatible with TreeSelect
       title: unit.name,
       children: [],
       parentId: unit.parentId || undefined,
