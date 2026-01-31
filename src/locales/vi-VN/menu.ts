@@ -16,7 +16,7 @@ export default {
   "menu.exception.500": "500",
   "menu.devices": "Phát thanh",
   "menu.devices.list": "Danh sách thiết bị",
-  "menu.devices.calendar": "Lịch phát thanh",
+  "menu.devices.schedule": "Lịch phát thanh",
   "menu.form": "Biểu mẫu",
   "menu.form.basic-form": "Biểu mẫu cơ bản",
   "menu.form.step-form": "Biểu mẫu bước",

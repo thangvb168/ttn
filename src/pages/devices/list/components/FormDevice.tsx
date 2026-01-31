@@ -1,4 +1,11 @@
 import { Device, DeviceStatus } from "@/models/Device";
+import { deviceService } from "@/services/device";
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
+  WifiOutlined,
+} from "@ant-design/icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
@@ -10,9 +17,10 @@ import {
   Row,
   Select,
   Slider,
+  message,
 } from "antd";
-import React, { useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import React, { useEffect, useState } from "react";
+import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { DeviceFormValues, deviceSchema } from "../schema/device";
 // Actually selecting Unit in a tree inside a form is nice, `TreeSelect`.
 // For now, let's use a simple Input or Select for unitId, or assume user knows unit ID?
@@ -41,16 +49,59 @@ export const FormDevice: React.FC<FormDeviceProps> = ({
     control,
     handleSubmit,
     reset,
+    trigger,
+    getValues,
     formState: { errors },
     setValue,
   } = useForm<DeviceFormValues>({
-    resolver: zodResolver(deviceSchema),
+    resolver: zodResolver(deviceSchema) as any,
     defaultValues: {
       status: DeviceStatus.ACTIVE,
       deviceConfig: { volume: 50 },
       hardwareInfo: { ipAddress: "", macAddress: "" },
     },
   });
+
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<
+    "success" | "error" | null
+  >(null);
+
+  // Reset connection status when modal closes or IP changes
+  useEffect(() => {
+    if (!open) {
+      setConnectionStatus(null);
+    }
+  }, [open]);
+
+  const handleTestConnection = async () => {
+    const ipAddress = getValues("hardwareInfo.ipAddress");
+    const isIpValid = await trigger("hardwareInfo.ipAddress");
+
+    if (!isIpValid || !ipAddress) {
+      message.error("Vui lòng nhập địa chỉ IP hợp lệ để kiểm tra kết nối");
+      return;
+    }
+
+    setIsTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
+      const result = await deviceService.testConnection({ ipAddress });
+      if (result.success) {
+        message.success(result.message);
+        setConnectionStatus("success");
+      } else {
+        message.error(result.message);
+        setConnectionStatus("error");
+      }
+    } catch (error) {
+      message.error("Có lỗi xảy ra khi kiểm tra kết nối");
+      setConnectionStatus("error");
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   // Prepare Tree Data for Unit selection
   const [treeData, setTreeData] = React.useState<any[]>([]);
@@ -101,7 +152,7 @@ export const FormDevice: React.FC<FormDeviceProps> = ({
     }
   }, [open, initialValues, reset]);
 
-  const onFinish = (data: DeviceFormValues) => {
+  const onFinish: SubmitHandler<DeviceFormValues> = (data) => {
     onSubmit(data);
   };
 
@@ -118,7 +169,7 @@ export const FormDevice: React.FC<FormDeviceProps> = ({
           key="submit"
           type="primary"
           loading={loading}
-          onClick={handleSubmit(onFinish)}
+          onClick={handleSubmit((data) => onFinish(data))}
         >
           Lưu
         </Button>,
@@ -247,7 +298,42 @@ export const FormDevice: React.FC<FormDeviceProps> = ({
                   name="hardwareInfo.ipAddress"
                   control={control}
                   render={({ field }) => (
-                    <Input {...field} placeholder="192.168.1.1" />
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        {...field}
+                        placeholder="192.168.1.1"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (connectionStatus) setConnectionStatus(null);
+                        }}
+                      />
+                      <Button
+                        type="dashed"
+                        size="middle"
+                        icon={
+                          isTestingConnection ? (
+                            <LoadingOutlined />
+                          ) : connectionStatus === "success" ? (
+                            <CheckCircleOutlined style={{ color: "#52c41a" }} />
+                          ) : connectionStatus === "error" ? (
+                            <CloseCircleOutlined style={{ color: "#ff4d4f" }} />
+                          ) : (
+                            <WifiOutlined />
+                          )
+                        }
+                        onClick={handleTestConnection}
+                        disabled={isTestingConnection}
+                        className="w-full"
+                      >
+                        {isTestingConnection
+                          ? "Đang kiểm tra..."
+                          : connectionStatus === "success"
+                          ? "Kết nối thành công"
+                          : connectionStatus === "error"
+                          ? "Kết nối thất bại"
+                          : "Thử kết nối"}
+                      </Button>
+                    </div>
                   )}
                 />
               </Form.Item>

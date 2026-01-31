@@ -1,194 +1,229 @@
 import { Unit, UnitType } from "@/models/Unit";
 import { AbstractMock } from "@/utils/abstract-mock";
 
+// Helper to slugify names for IDs
+const toSlug = (str: string) => {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .replace(/([^0-9a-z-\s])/g, "")
+    .replace(/(\s+)/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+const hanoiData = [
+  {
+    name: "Ba Đình",
+    wards: [
+      "Phúc Xá",
+      "Trúc Bạch",
+      "Vĩnh Phúc",
+      "Cống Vị",
+      "Liễu Giai",
+      "Nguyễn Trung Trực",
+      "Quán Thánh",
+      "Ngọc Hà",
+      "Điện Biên",
+      "Đội Cấn",
+    ],
+  },
+  {
+    name: "Hoàn Kiếm",
+    wards: [
+      "Phúc Tân",
+      "Đồng Xuân",
+      "Hàng Mã",
+      "Hàng Buồm",
+      "Hàng Đào",
+      "Hàng Bồ",
+      "Cửa Đông",
+      "Cửa Nam",
+      "Hàng Gai",
+      "Hàng Bông",
+    ],
+  },
+  {
+    name: "Đống Đa",
+    wards: [
+      "Cát Linh",
+      "Văn Miếu",
+      "Quốc Tử Giám",
+      "Láng Thượng",
+      "Ô Chợ Dừa",
+      "Văn Chương",
+      "Hàng Bột",
+      "Láng Hạ",
+      "Khâm Thiên",
+      "Thổ Quan",
+    ],
+  },
+  {
+    name: "Hai Bà Trưng",
+    wards: [
+      "Nguyễn Du",
+      "Bạch Đằng",
+      "Phạm Đình Hổ",
+      "Bùi Thị Xuân",
+      "Ngô Thì Nhậm",
+      "Lê Đại Hành",
+      "Đồng Nhân",
+      "Phố Huế",
+      "Đống Mác",
+      "Thanh Lương",
+    ],
+  },
+  {
+    name: "Thanh Xuân",
+    wards: [
+      "Hạ Đình",
+      "Kim Giang",
+      "Khương Đình",
+      "Khương Mai",
+      "Khương Trung",
+      "Nhân Chính",
+      "Phương Liệt",
+      "Thanh Xuân Bắc",
+      "Thanh Xuân Nam",
+      "Thanh Xuân Trung",
+    ],
+  },
+  {
+    name: "Hoàng Mai",
+    wards: [
+      "Hoàng Liệt",
+      "Yên Sở",
+      "Vĩnh Hưng",
+      "Định Công",
+      "Đại Kim",
+      "Thịnh Liệt",
+      "Thanh Trì",
+      "Lĩnh Nam",
+      "Trần Phú",
+      "Mai Động",
+    ],
+  },
+  {
+    name: "Long Biên",
+    wards: [
+      "Thượng Thanh",
+      "Giang Biên",
+      "Ngọc Thụy",
+      "Việt Hưng",
+      "Phúc Lợi",
+      "Thạch Bàn",
+      "Cự Khối",
+      "Gia Thụy",
+      "Bồ Đề",
+      "Long Biên",
+    ],
+  },
+  {
+    name: "Hà Đông",
+    wards: [
+      "Nguyễn Trãi",
+      "Mộ Lao",
+      "Văn Quán",
+      "Vạn Phúc",
+      "Yết Kiêu",
+      "Quang Trung",
+      "La Khê",
+      "Phú La",
+      "Phúc La",
+      "Hà Cầu",
+    ],
+  },
+  {
+    name: "Nam Từ Liêm",
+    wards: [
+      "Cầu Diễn",
+      "Mỹ Đình 1",
+      "Mỹ Đình 2",
+      "Phú Đô",
+      "Mễ Trì",
+      "Trung Văn",
+      "Đại Mỗ",
+      "Tây Mỗ",
+      "Phương Canh",
+      "Xuân Phương",
+    ],
+  },
+  {
+    name: "Bắc Từ Liêm",
+    wards: [
+      "Thượng Cát",
+      "Liên Mạc",
+      "Thụy Phương",
+      "Minh Khai",
+      "Tây Tựu",
+      "Đông Ngạc",
+      "Đức Thắng",
+      "Xuân Đỉnh",
+      "Xuân Tảo",
+      "Cổ Nhuế 1",
+    ],
+  },
+];
+
 const defaultData: Unit[] = [
-  // Miền Bắc
+  // Hà Nội
   ...(() => {
-    const cities = [
-      "Hà Nội",
-      "Hải Phòng",
-      "Quảng Ninh",
-      "Bắc Ninh",
-      "Nam Định",
-    ];
-    const wards = [
-      ["Ba Đình", "Hoàn Kiếm", "Đống Đa", "Hai Bà Trưng", "Cầu Giấy"],
-      ["Hồng Bàng", "Lê Chân", "Ngô Quyền", "Kiến An", "Dương Kinh"],
-      ["Hạ Long", "Cẩm Phả", "Uông Bí", "Móng Cái", "Quảng Yên"],
-      ["Bắc Ninh", "Từ Sơn", "Quế Võ", "Yên Phong", "Thuận Thành"],
-      ["Nam Định", "Mỹ Lộc", "Vụ Bản", "Ý Yên", "Trực Ninh"],
-    ];
+    const provinceId = "province-hanoi";
     const result: Unit[] = [
       {
-        id: "mien-bac",
-        name: "Miền Bắc",
+        id: provinceId,
+        name: "Hà Nội",
         type: UnitType.DEPARTMENT,
         parentId: null,
-        path: "/mien-bac",
+        path: "/hanoi",
       },
       {
-        id: "admin-mien-bac",
-        name: "Admin Miền Bắc",
+        id: `admin-${provinceId}`,
+        name: "Admin Hà Nội",
         type: UnitType.EMPLOYEE,
-        parentId: "mien-bac",
-        path: "/mien-bac/admin",
+        parentId: provinceId,
+        path: `/hanoi/admin`,
       },
     ];
-    cities.forEach((city, i) => {
-      const cityId = `mb-city-${i}`;
+
+    hanoiData.forEach((district, i) => {
+      const districtSlug = toSlug(district.name);
+      const districtId = `district-${districtSlug}`;
+
       result.push({
-        id: cityId,
-        name: city,
+        id: districtId,
+        name: district.name,
         type: UnitType.DEPARTMENT,
-        parentId: "mien-bac",
-        path: `/mien-bac/${cityId}`,
+        parentId: provinceId,
+        path: `/hanoi/${districtId}`,
       });
       result.push({
-        id: `admin-${cityId}`,
-        name: `Admin ${city}`,
+        id: `admin-${districtId}`,
+        name: `Admin ${district.name}`,
         type: UnitType.EMPLOYEE,
-        parentId: cityId,
-        path: `/mien-bac/${cityId}/admin`,
+        parentId: districtId,
+        path: `/hanoi/${districtId}/admin`,
       });
-      wards[i].forEach((ward, j) => {
-        const wardId = `${cityId}-ward-${j}`;
+
+      district.wards.forEach((wardName, j) => {
+        const wardSlug = toSlug(wardName);
+        // Use 'ward-' prefix to maintain compatibility with device generation logic if it relies on string parsing
+        const wardId = `ward-${districtSlug}-${wardSlug}`;
+
         result.push({
           id: wardId,
-          name: ward,
+          name: wardName,
           type: UnitType.DEPARTMENT,
-          parentId: cityId,
-          path: `/mien-bac/${cityId}/${wardId}`,
+          parentId: districtId,
+          path: `/hanoi/${districtId}/${wardId}`,
         });
         result.push({
           id: `admin-${wardId}`,
-          name: `Admin ${ward}`,
+          name: `Admin ${wardName}`,
           type: UnitType.EMPLOYEE,
           parentId: wardId,
-          path: `/mien-bac/${cityId}/${wardId}/admin`,
-        });
-      });
-    });
-    return result;
-  })(),
-  // Miền Trung
-  ...(() => {
-    const cities = ["Đà Nẵng", "Huế", "Quảng Nam", "Quảng Ngãi", "Bình Định"];
-    const wards = [
-      ["Hải Châu", "Thanh Khê", "Sơn Trà", "Ngũ Hành Sơn", "Liên Chiểu"],
-      ["Phú Hội", "Phú Nhuận", "Thuận Thành", "Tây Lộc", "Vĩnh Ninh"],
-      ["Tam Kỳ", "Hội An", "Điện Bàn", "Núi Thành", "Duy Xuyên"],
-      ["Quảng Ngãi", "Đức Phổ", "Sơn Tịnh", "Tư Nghĩa", "Bình Sơn"],
-      ["Quy Nhơn", "An Nhơn", "Tuy Phước", "Phù Cát", "Hoài Nhơn"],
-    ];
-    const result: Unit[] = [
-      {
-        id: "mien-trung",
-        name: "Miền Trung",
-        type: UnitType.DEPARTMENT,
-        parentId: null,
-        path: "/mien-trung",
-      },
-      {
-        id: "admin-mien-trung",
-        name: "Admin Miền Trung",
-        type: UnitType.EMPLOYEE,
-        parentId: "mien-trung",
-        path: "/mien-trung/admin",
-      },
-    ];
-    cities.forEach((city, i) => {
-      const cityId = `mt-city-${i}`;
-      result.push({
-        id: cityId,
-        name: city,
-        type: UnitType.DEPARTMENT,
-        parentId: "mien-trung",
-        path: `/mien-trung/${cityId}`,
-      });
-      result.push({
-        id: `admin-${cityId}`,
-        name: `Admin ${city}`,
-        type: UnitType.EMPLOYEE,
-        parentId: cityId,
-        path: `/mien-trung/${cityId}/admin`,
-      });
-      wards[i].forEach((ward, j) => {
-        const wardId = `${cityId}-ward-${j}`;
-        result.push({
-          id: wardId,
-          name: ward,
-          type: UnitType.DEPARTMENT,
-          parentId: cityId,
-          path: `/mien-trung/${cityId}/${wardId}`,
-        });
-        result.push({
-          id: `admin-${wardId}`,
-          name: `Admin ${ward}`,
-          type: UnitType.EMPLOYEE,
-          parentId: wardId,
-          path: `/mien-trung/${cityId}/${wardId}/admin`,
-        });
-      });
-    });
-    return result;
-  })(),
-  // Miền Nam
-  ...(() => {
-    const cities = ["TP. HCM", "Cần Thơ", "Vũng Tàu", "Đồng Nai", "Bình Dương"];
-    const wards = [
-      ["Thủ Đức", "Quận 1", "Quận 3", "Quận 7", "Bình Thạnh"],
-      ["Ninh Kiều", "Bình Thủy", "Cái Răng", "Ô Môn", "Thốt Nốt"],
-      ["Vũng Tàu", "Bà Rịa", "Long Điền", "Đất Đỏ", "Xuyên Mộc"],
-      ["Biên Hòa", "Long Khánh", "Trảng Bom", "Vĩnh Cửu", "Nhơn Trạch"],
-      ["Thủ Dầu Một", "Dĩ An", "Thuận An", "Bến Cát", "Tân Uyên"],
-    ];
-    const result: Unit[] = [
-      {
-        id: "mien-nam",
-        name: "Miền Nam",
-        type: UnitType.DEPARTMENT,
-        parentId: null,
-        path: "/mien-nam",
-      },
-      {
-        id: "admin-mien-nam",
-        name: "Admin Miền Nam",
-        type: UnitType.EMPLOYEE,
-        parentId: "mien-nam",
-        path: "/mien-nam/admin",
-      },
-    ];
-    cities.forEach((city, i) => {
-      const cityId = `mn-city-${i}`;
-      result.push({
-        id: cityId,
-        name: city,
-        type: UnitType.DEPARTMENT,
-        parentId: "mien-nam",
-        path: `/mien-nam/${cityId}`,
-      });
-      result.push({
-        id: `admin-${cityId}`,
-        name: `Admin ${city}`,
-        type: UnitType.EMPLOYEE,
-        parentId: cityId,
-        path: `/mien-nam/${cityId}/admin`,
-      });
-      wards[i].forEach((ward, j) => {
-        const wardId = `${cityId}-ward-${j}`;
-        result.push({
-          id: wardId,
-          name: ward,
-          type: UnitType.DEPARTMENT,
-          parentId: cityId,
-          path: `/mien-nam/${cityId}/${wardId}`,
-        });
-        result.push({
-          id: `admin-${wardId}`,
-          name: `Admin ${ward}`,
-          type: UnitType.EMPLOYEE,
-          parentId: wardId,
-          path: `/mien-nam/${cityId}/${wardId}/admin`,
+          path: `/hanoi/${districtId}/${wardId}/admin`,
         });
       });
     });

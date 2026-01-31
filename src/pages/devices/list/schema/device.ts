@@ -5,7 +5,7 @@ export const deviceSchema = z.object({
   code: z.string().min(1, "Mã thiết bị là bắt buộc"),
   name: z.string().min(1, "Tên thiết bị là bắt buộc"),
   unitId: z.string().min(1, "Đơn vị là bắt buộc"),
-  status: z.nativeEnum(DeviceStatus).default(DeviceStatus.ACTIVE),
+  status: z.nativeEnum(DeviceStatus),
   hardwareInfo: z.object({
     ipAddress: z.string().optional().or(z.literal("")),
     macAddress: z.string().min(1, "MAC Address là bắt buộc"),

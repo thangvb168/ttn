@@ -20,17 +20,18 @@ const generateMacAddress = (counter: number, deviceNum: number): string => {
 const generateSerialNumber = (unitId: string, deviceNum: number): string => {
   const year = 2024;
   const month = (deviceNum % 12) + 1;
-  return `SN${year}${month.toString().padStart(2, "0")}${unitId
-    .toUpperCase()
-    .slice(-4)}${deviceNum.toString().padStart(4, "0")}`;
+  // Ensure we get a safe string slice even if unitId is different length
+  const unitSuffix = unitId.replace(/-/g, "").toUpperCase().slice(-4);
+  return `SN${year}${month.toString().padStart(2, "0")}${unitSuffix}${deviceNum
+    .toString()
+    .padStart(4, "0")}`;
 };
 
 mockUnits.getAll().forEach((unit) => {
-  // Chỉ tạo thiết bị cho xã (DEPARTMENT, parent là thành phố)
+  // Chỉ tạo thiết bị cho xã/phường (bắt đầu bằng ward-)
   if (
     unit.type === "DEPARTMENT" &&
-    unit.parentId &&
-    unit.parentId.includes("city") &&
+    unit.id.startsWith("ward-") &&
     !unit.id.includes("admin")
   ) {
     // Tạo 10 thiết bị cho mỗi xã
@@ -46,16 +47,22 @@ mockUnits.getAll().forEach((unit) => {
       else if (rand < 19) status = DeviceStatus.ERROR;
       else status = DeviceStatus.MAINTENANCE;
 
-      // Tạo tọa độ gần vị trí trung tâm Việt Nam (có thể điều chỉnh)
-      const baseLat = 16.0 + (deviceCounter % 10) * 0.1;
-      const baseLng = 108.0 + (deviceCounter % 10) * 0.1;
-      const lat = baseLat + (i - 1) * 0.01;
-      const lng = baseLng + (i - 1) * 0.01;
+      // Tạo tọa độ gần vị trí Hà Nội (random nhỏ xung quanh tâm)
+      // Base Lat/Lng Hà Nội approx 21.0285, 105.8542
+      // Thêm jitter dựa trên deviceCounter để các xã không chồng lên nhau
+      const baseLat = 21.0 + (deviceCounter % 50) * 0.005;
+      const baseLng = 105.8 + (deviceCounter % 50) * 0.005;
+      const lat = baseLat + (i - 1) * 0.0005;
+      const lng = baseLng + (i - 1) * 0.0005;
 
       defaultData.push({
         id: `device-${unit.id}-${i}`,
-        code: `TX-${unit.id.toUpperCase()}-${i.toString().padStart(3, "0")}`,
-        name: `Máy phát thanh ${unit.name} ${i}`,
+        code: `TX-${unit.id
+          .replace("ward-", "")
+          .replace(/-/g, "")
+          .toUpperCase()
+          .slice(0, 5)}-${i.toString().padStart(3, "0")}`,
+        name: `Loa ${unit.name} ${i}`,
         unitId: unit.id,
         status,
 
@@ -74,7 +81,7 @@ mockUnits.getAll().forEach((unit) => {
         },
 
         location: {
-          address: `${unit.name}, Khu vực ${i}`,
+          address: `${unit.name}, Vị trí cột ${i}`,
           lat,
           lng,
         },
