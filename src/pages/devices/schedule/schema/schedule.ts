@@ -13,34 +13,80 @@ export const scheduleSchema = z
 
     // Source Config
     sourceType: z.nativeEnum(ScheduleSourceType),
-    sourceUrl: z.string().optional(), // Validate conditionally based on sourceType
+    sourceUrl: z.string().optional(),
+    fileUrl: z.string().optional(),
+    streamUrl: z.string().optional(),
     ttsContent: z.string().optional(),
 
+    // Relay Broadcasting Config
+    sourceUnitId: z.string().optional(),
+    sourceChannelId: z.string().optional(),
+    relayFromLevel: z.enum(["PROVINCE", "DISTRICT", "COMMUNE"]).optional(),
+
     // Time Config
-    startTime: z.date(),
+    startTime: z.date({
+      error: "Vui lòng chọn thời gian bắt đầu",
+      // invalid_type_error: "Thời gian bắt đầu không hợp lệ",
+    }),
     endTime: z.date().optional(),
 
     // Targeting
-    targetUnitIds: z.array(z.string()),
+    targetUnitIds: z
+      .array(z.string())
+      .min(1, "Vui lòng chọn ít nhất một đơn vị"),
     targetDeviceIds: z.array(z.string()),
 
     // Routine
     daysOfWeek: z.array(z.number()).optional(),
   })
-  .refine(
-    (data) => {
-      if (data.sourceType === ScheduleSourceType.TTS && !data.ttsContent) {
-        return false;
+  .superRefine((data, ctx) => {
+    // Validate TTS content
+    if (data.sourceType === ScheduleSourceType.TTS) {
+      if (!data.ttsContent || data.ttsContent.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Vui lòng nhập nội dung văn bản",
+          path: ["ttsContent"],
+        });
       }
-      if (data.sourceType !== ScheduleSourceType.TTS && !data.sourceUrl) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "Vui lòng nhập nội dung hoặc đường dẫn nguồn phát",
-      path: ["sourceUrl"], // Point error to sourceUrl generally
     }
-  );
+    // Validate FILE source
+    else if (data.sourceType === ScheduleSourceType.FILE) {
+      if (!data.fileUrl || data.fileUrl.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Vui lòng nhập đường dẫn file",
+          path: ["fileUrl"],
+        });
+      }
+    }
+    // Validate STREAM source
+    else if (data.sourceType === ScheduleSourceType.STREAM) {
+      if (!data.streamUrl || data.streamUrl.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Vui lòng nhập đường dẫn stream",
+          path: ["streamUrl"],
+        });
+      }
+    }
+    // Validate RELAY source
+    else if (data.sourceType === ScheduleSourceType.RELAY) {
+      if (!data.sourceUnitId || data.sourceUnitId.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Vui lòng chọn đơn vị nguồn",
+          path: ["sourceUnitId"],
+        });
+      }
+      if (!data.sourceChannelId || data.sourceChannelId.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Vui lòng chọn kênh phát sóng",
+          path: ["sourceChannelId"],
+        });
+      }
+    }
+  });
 
 export type ScheduleFormValues = z.infer<typeof scheduleSchema>;

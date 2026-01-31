@@ -3,23 +3,28 @@ import { mockUnits } from "@/mocks/mockUnit";
 import { ScheduleSourceType, ScheduleType } from "@/models/Schedule";
 import { UnitType } from "@/models/Unit";
 import { buildTree } from "@/pages/devices/list/utils/build-tree";
+import { UploadOutlined } from "@ant-design/icons";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ProForm,
-  ProFormCheckbox,
-  ProFormDatePicker,
-  ProFormDependency,
-  ProFormDigit,
-  ProFormRadio,
-  ProFormSelect,
-  ProFormText,
-  ProFormTextArea,
-  ProFormTreeSelect,
-  StepsForm,
-} from "@ant-design/pro-components";
-import { Modal, message } from "antd";
+  Button,
+  Col,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Radio,
+  Row,
+  Segmented,
+  Select,
+  TreeSelect,
+  Upload,
+  message,
+} from "antd";
 import dayjs from "dayjs";
-import React, { useRef } from "react";
-import { ScheduleFormValues } from "../schema/schedule";
+import React, { useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { ScheduleFormValues, scheduleSchema } from "../schema/schedule";
+import { RelaySourceSelector } from "./RelaySourceSelector";
 
 interface ScheduleFormProps {
   open: boolean;
@@ -34,236 +39,409 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   onSubmit,
   initialValues,
 }) => {
-  const formRef = useRef<any>(null);
+  const {
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors, isValid },
+  } = useForm<ScheduleFormValues>({
+    resolver: zodResolver(scheduleSchema),
+    defaultValues: {
+      type: ScheduleType.ROUTINE,
+      priority: 5,
+      sourceType: ScheduleSourceType.FILE,
+      targetUnitIds: [],
+      targetDeviceIds: [],
+      ...initialValues,
+    },
+  });
 
-  const onFinish = async (values: ScheduleFormValues) => {
-    // Transform logic if needed
-    console.log("Form Submit:", values);
-    onSubmit(values);
+  // Watch values for conditional rendering
+  const sourceType = watch("sourceType");
+  const targetUnitIds = watch("targetUnitIds");
+  const type = watch("type");
+
+  // Segment state for filtering (All / Unit / Relay)
+  const [scheduleCategory, setScheduleCategory] = React.useState<
+    "all" | "unit" | "relay"
+  >("unit");
+
+  useEffect(() => {
+    if (open) {
+      if (initialValues) {
+        // Map initial values to form fields
+        const formattedValues = {
+          ...initialValues,
+          startTime: initialValues.startTime
+            ? dayjs(initialValues.startTime)
+            : undefined,
+          endTime: initialValues.endTime
+            ? dayjs(initialValues.endTime)
+            : undefined,
+          // If editing, we might need to separate sourceUrl back to fileUrl/streamUrl
+          fileUrl:
+            initialValues.sourceType === ScheduleSourceType.FILE
+              ? initialValues.sourceUrl
+              : undefined,
+          streamUrl:
+            initialValues.sourceType === ScheduleSourceType.STREAM
+              ? initialValues.sourceUrl
+              : undefined,
+        };
+        // @ts-ignore - dayjs type mismatch with zod date sometimes needs explicit casting or just ignoring in quick resets if valid
+        reset(formattedValues);
+      } else {
+        reset({
+          type: ScheduleType.ROUTINE,
+          priority: 5,
+          sourceType: ScheduleSourceType.FILE,
+          targetUnitIds: [],
+          targetDeviceIds: [],
+        });
+      }
+    }
+  }, [open, initialValues, reset]);
+
+  const onFinish = (data: ScheduleFormValues) => {
+    // Transform fileUrl/streamUrl back to sourceUrl
+    let finalData = { ...data };
+    if (data.sourceType === ScheduleSourceType.FILE) {
+      finalData.sourceUrl = data.fileUrl;
+    } else if (data.sourceType === ScheduleSourceType.STREAM) {
+      finalData.sourceUrl = data.streamUrl;
+    }
+
+    const payload = {
+      ...finalData,
+      startTime: (finalData.startTime as any)?.toDate
+        ? (finalData.startTime as any).toDate()
+        : finalData.startTime,
+      endTime: (finalData.endTime as any)?.toDate
+        ? (finalData.endTime as any).toDate()
+        : finalData.endTime,
+    };
+
+    console.log("Form Submit:", payload);
+    onSubmit(payload as ScheduleFormValues);
     message.success(
       initialValues ? "Cập nhật lịch thành công!" : "Tạo lịch thành công!"
     );
-    return true;
+    onCancel();
   };
 
   const unitTreeData = buildTree(
     mockUnits.getAll().filter((u) => u.type !== UnitType.EMPLOYEE)
   );
 
+  // Filter devices logic
+  const filteredDevices = React.useMemo(() => {
+    const unitIds = targetUnitIds || [];
+    return mockDevices
+      .getAll()
+      .filter((d) => unitIds.length === 0 || unitIds.includes(d.unitId))
+      .map((d) => ({
+        label: `${d.name} (${d.hardwareInfo?.ipAddress})`,
+        value: d.id,
+      }));
+  }, [targetUnitIds]);
+
   return (
-    <StepsForm<ScheduleFormValues>
-      formRef={formRef}
-      onFinish={onFinish}
-      formProps={{
-        validateMessages: {
-          required: "Vui lòng nhập ${label}!",
-        },
-      }}
-      stepsProps={{
-        size: "small",
-      }}
-      stepsFormRender={(dom, submitter) => {
-        return (
-          <Modal
-            title={initialValues ? "Cập nhật lịch phát" : "Tạo lịch phát mới"}
-            width={800}
-            onCancel={onCancel}
-            open={open}
-            footer={submitter}
-            destroyOnClose
-          >
-            {dom}
-          </Modal>
-        );
-      }}
+    <Modal
+      title={initialValues ? "Cập nhật lịch phát" : "Tạo lịch phát mới"}
+      width={800}
+      open={open}
+      onCancel={onCancel}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button onClick={onCancel}>Hủy</Button>
+          <Button type="primary" onClick={handleSubmit(onFinish)}>
+            {initialValues ? "Cập nhật" : "Tạo mới"}
+          </Button>
+        </div>
+      }
+      destroyOnHidden
     >
-      {/* STEP 1: GENERAL INFO */}
-      <StepsForm.StepForm
-        name="step1" // unique name
-        title="Thông tin chung"
-        initialValues={initialValues}
-      >
-        <ProForm.Group>
-          <ProFormText
-            name="title"
-            label="Tên lịch phát"
-            // width="md" // Removed to fill width
-            placeholder="Nhập tên lịch phát..."
-            rules={[{ required: true }]}
-            colProps={{ span: 16 }} // Use Col span for layout control
+      <Form layout="vertical" className="mt-4">
+        {/* CARD 1: GENERAL INFO */}
+
+        <Row gutter={16}>
+          <Col span={16}>
+            <Form.Item
+              label="Tên lịch phát"
+              validateStatus={errors.title ? "error" : ""}
+              help={errors.title?.message}
+              required
+            >
+              <Controller
+                name="title"
+                control={control}
+                render={({ field }) => (
+                  <Input {...field} placeholder="Nhập tên lịch phát..." />
+                )}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item
+              label="Loại lịch"
+              validateStatus={errors.type ? "error" : ""}
+              help={errors.type?.message}
+              required
+            >
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    options={[
+                      {
+                        label: "Định kỳ (Hàng ngày/Tuần)",
+                        value: ScheduleType.ROUTINE,
+                      },
+                      { label: "Một lần", value: ScheduleType.ONE_TIME },
+                      { label: "Khẩn cấp", value: ScheduleType.EMERGENCY },
+                    ]}
+                  />
+                )}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item label="Mô tả">
+          <Controller
+            name="description"
+            control={control}
+            render={({ field }) => (
+              <Input.TextArea
+                {...field}
+                placeholder="Mô tả nội dung..."
+                rows={5}
+              />
+            )}
           />
-          <ProFormSelect
-            name="type"
-            label="Loại lịch"
-            // width="sm" // Removed
+        </Form.Item>
+
+        {/* CARD 2: SOURCE CONFIG */}
+        <Form.Item label="Loại lịch phát">
+          <Segmented
+            value={scheduleCategory}
+            onChange={(value: string | number) => {
+              setScheduleCategory(value as "all" | "unit" | "relay");
+              // Auto-switch sourceType based on category
+              if (value === "relay") {
+                setValue("sourceType", ScheduleSourceType.RELAY);
+              } else if (value === "unit") {
+                setValue("sourceType", ScheduleSourceType.FILE);
+              }
+            }}
             options={[
-              {
-                label: "Định kỳ (Hàng ngày/Tuần)",
-                value: ScheduleType.ROUTINE,
-              },
-              { label: "Một lần", value: ScheduleType.ONE_TIME },
-              { label: "Khẩn cấp", value: ScheduleType.EMERGENCY },
+              { label: "Tất cả", value: "all" },
+              { label: "Đơn vị", value: "unit" },
+              { label: "Tiếp sóng", value: "relay" },
             ]}
-            rules={[{ required: true }]}
-            initialValue={ScheduleType.ROUTINE}
-            colProps={{ span: 8 }}
+            block
           />
-        </ProForm.Group>
+        </Form.Item>
 
-        <ProFormTextArea
-          name="description"
-          label="Mô tả"
-          placeholder="Mô tả nội dung..."
-        />
+        <Form.Item label="Chọn nguồn phát">
+          <Controller
+            name="sourceType"
+            control={control}
+            render={({ field }) => (
+              <Radio.Group
+                {...field}
+                options={
+                  scheduleCategory === "relay"
+                    ? [
+                        {
+                          label: "Tiếp sóng từ cấp trên",
+                          value: ScheduleSourceType.RELAY,
+                        },
+                      ]
+                    : scheduleCategory === "unit"
+                    ? [
+                        { label: "File Audio", value: ScheduleSourceType.FILE },
+                        {
+                          label: "Chuyển văn bản (TTS)",
+                          value: ScheduleSourceType.TTS,
+                        },
+                      ]
+                    : [
+                        { label: "File Audio", value: ScheduleSourceType.FILE },
+                        {
+                          label: "Chuyển văn bản (TTS)",
+                          value: ScheduleSourceType.TTS,
+                        },
+                        {
+                          label: "Tiếp sóng từ cấp trên",
+                          value: ScheduleSourceType.RELAY,
+                        },
+                      ]
+                }
+              />
+            )}
+          />
+        </Form.Item>
 
-        <ProFormDigit
-          name="priority"
-          label="Độ ưu tiên (1-10)"
-          width="xs"
-          min={1}
-          max={10}
-          initialValue={5}
-        />
-      </StepsForm.StepForm>
+        {sourceType === ScheduleSourceType.FILE && (
+          <Form.Item
+            label="Đường dẫn File"
+            required
+            validateStatus={errors.fileUrl ? "error" : ""}
+            help={errors.fileUrl?.message}
+          >
+            <Controller
+              name="fileUrl"
+              control={control}
+              render={({ field }) => (
+                <Upload
+                  name={field.name}
+                  accept="audio/*"
+                  maxCount={1}
+                  beforeUpload={(file) => {
+                    const url = URL.createObjectURL(file);
+                    field.onChange(url);
+                    return false;
+                  }}
+                  onRemove={() => {
+                    field.onChange("");
+                  }}
+                  fileList={
+                    field.value
+                      ? [
+                          {
+                            uid: "-1",
+                            name: "Audio File",
+                            status: "done",
+                            url: field.value,
+                          },
+                        ]
+                      : []
+                  }
+                >
+                  <Button icon={<UploadOutlined />}>Chọn file Audio</Button>
+                </Upload>
+              )}
+            />
+          </Form.Item>
+        )}
 
-      {/* STEP 2: SOURCE CONFIG */}
-      <StepsForm.StepForm
-        name="step2"
-        title="Nguồn phát"
-        initialValues={initialValues}
-      >
-        <ProFormRadio.Group
-          name="sourceType"
-          label="Chọn nguồn phát"
-          options={[
-            { label: "File Audio", value: ScheduleSourceType.FILE },
-            { label: "Tiếp sóng", value: ScheduleSourceType.STREAM },
-            { label: "Chuyển văn bản (TTS)", value: ScheduleSourceType.TTS },
-          ]}
-          initialValue={ScheduleSourceType.FILE}
-        />
-
-        <ProFormDependency name={["sourceType"]}>
-          {({ sourceType }) => {
-            if (sourceType === ScheduleSourceType.FILE) {
-              return (
-                <ProFormText
-                  name="fileUrl"
-                  label="Đường dẫn File"
-                  placeholder="Chọn hoặc nhập link file..."
-                />
-              );
-            }
-            if (sourceType === ScheduleSourceType.STREAM) {
-              return (
-                <ProFormText
-                  name="streamUrl"
-                  label="Luồng tiếp sóng"
-                  placeholder="Nhập URL stream..."
-                />
-              );
-            }
-            if (sourceType === ScheduleSourceType.TTS) {
-              return (
-                <ProFormTextArea
-                  name="ttsContent"
-                  label="Nội dung văn bản"
+        {sourceType === ScheduleSourceType.TTS && (
+          <Form.Item
+            label="Nội dung văn bản"
+            required
+            validateStatus={errors.ttsContent ? "error" : ""}
+            help={errors.ttsContent?.message}
+          >
+            <Controller
+              name="ttsContent"
+              control={control}
+              render={({ field }) => (
+                <Input.TextArea
+                  {...field}
+                  rows={4}
                   placeholder="Nhập nội dung cần chuyển thành giọng nói..."
                 />
-              );
+              )}
+            />
+          </Form.Item>
+        )}
+
+        {sourceType === ScheduleSourceType.RELAY && (
+          <RelaySourceSelector
+            sourceUnitId={watch("sourceUnitId")}
+            sourceChannelId={watch("sourceChannelId")}
+            relayFromLevel={watch("relayFromLevel")}
+            onSourceUnitChange={(value) => setValue("sourceUnitId", value)}
+            onSourceChannelChange={(value) =>
+              setValue("sourceChannelId", value)
             }
-            return null;
-          }}
-        </ProFormDependency>
-      </StepsForm.StepForm>
-
-      {/* STEP 3: PREPARE TARGET & TIME */}
-      <StepsForm.StepForm
-        name="step3"
-        title="Phạm vi & Thời gian"
-        initialValues={{
-          ...initialValues,
-          // Ensure dates are dayjs if present
-          startTime: initialValues?.startTime
-            ? dayjs(initialValues.startTime)
-            : undefined,
-          endTime: initialValues?.endTime
-            ? dayjs(initialValues.endTime)
-            : undefined,
-        }}
-      >
-        <ProFormTreeSelect
-          name="targetUnitIds"
-          label="Chọn Đơn vị / Địa bàn"
-          placeholder="Chọn đơn vị..."
-          allowClear
-          // width="md" // Remove width constraint
-          treeData={unitTreeData}
-          fieldProps={{
-            treeCheckable: true,
-            showCheckedStrategy: "SHOW_PARENT",
-            treeDefaultExpandAll: true, // Ensure we see data if hierarchy is deep
-          }}
-        />
-
-        <ProFormDependency name={["targetUnitIds"]}>
-          {({ targetUnitIds }) => {
-            // Filter devices based on selected units
-            const unitIds = targetUnitIds || [];
-            const filteredDevices = mockDevices
-              .getAll()
-              .filter((d) => unitIds.length === 0 || unitIds.includes(d.unitId))
-              .map((d) => ({
-                label: `${d.name} (${d.hardwareInfo?.ipAddress})`,
-                value: d.id,
-              }));
-
-            return (
-              <ProFormSelect
-                name="targetDeviceIds"
-                label="Chọn Thiết bị (Để trống = Chọn tất cả trong đơn vị)"
-                mode="multiple"
-                placeholder="Chọn thiết bị cụ thể..."
-                options={filteredDevices}
-              />
-            );
-          }}
-        </ProFormDependency>
-
-        <ProForm.Group title="Thời gian">
-          <ProFormDependency name={["type"]}>
-            {({ type }) => {
-              const isRoutine = type === ScheduleType.ROUTINE;
-              return (
-                <>
-                  <ProFormDatePicker
-                    name="endTime"
-                    label="Kết thúc"
-                    showTime
-                    width="md"
-                  />
-
-                  {isRoutine && (
-                    <ProFormCheckbox.Group
-                      name="daysOfWeek"
-                      label="Lặp lại"
-                      options={[
-                        { label: "T2", value: 1 },
-                        { label: "T3", value: 2 },
-                        { label: "T4", value: 3 },
-                        { label: "T5", value: 4 },
-                        { label: "T6", value: 5 },
-                        { label: "T7", value: 6 },
-                        { label: "CN", value: 0 },
-                      ]}
-                    />
-                  )}
-                </>
-              );
+            onRelayLevelChange={(value) => setValue("relayFromLevel", value)}
+            errors={{
+              sourceUnitId: errors.sourceUnitId?.message,
+              sourceChannelId: errors.sourceChannelId?.message,
             }}
-          </ProFormDependency>
-        </ProForm.Group>
-      </StepsForm.StepForm>
-    </StepsForm>
+          />
+        )}
+
+        {/* CARD 3: TARGET & TIME */}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="Chọn Đơn vị / Địa bàn"
+              validateStatus={errors.targetUnitIds ? "error" : ""}
+              help={errors.targetUnitIds?.message}
+            >
+              <Controller
+                name="targetUnitIds"
+                control={control}
+                render={({ field }) => (
+                  <TreeSelect
+                    {...field}
+                    treeData={unitTreeData}
+                    treeCheckable
+                    showCheckedStrategy={TreeSelect.SHOW_PARENT}
+                    placeholder="Chọn đơn vị..."
+                    treeDefaultExpandAll
+                    allowClear
+                  />
+                )}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Chọn Thiết bị (Để trống = Chọn tất cả)">
+              <Controller
+                name="targetDeviceIds"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    mode="multiple"
+                    options={filteredDevices}
+                    placeholder="Chọn thiết bị cụ thể..."
+                    allowClear
+                  />
+                )}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="Bắt đầu"
+              required
+              validateStatus={errors.startTime ? "error" : ""}
+              help={errors.startTime?.message}
+            >
+              <Controller
+                name="startTime"
+                control={control}
+                render={({ field }) => (
+                  <DatePicker {...field} showTime className="w-full" />
+                )}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Kết thúc">
+              <Controller
+                name="endTime"
+                control={control}
+                render={({ field }) => (
+                  <DatePicker {...field} showTime className="w-full" />
+                )}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Form>
+    </Modal>
   );
 };

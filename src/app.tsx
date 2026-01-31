@@ -1,5 +1,4 @@
 import { AvatarDropdown, AvatarName, Footer, SelectLang } from "@/components";
-import { currentUser as queryCurrentUser } from "@/services/ant-design-pro/api";
 import { LinkOutlined } from "@ant-design/icons";
 import type { Settings as LayoutSettings } from "@ant-design/pro-components";
 import { SettingDrawer } from "@ant-design/pro-components";
@@ -22,17 +21,19 @@ export async function getInitialState(): Promise<{
   fetchUserInfo?: () => Promise<API.CurrentUser | undefined>;
 }> {
   const fetchUserInfo = async () => {
+    // Mock: Return user from localStorage or undefined
     try {
-      const msg = await queryCurrentUser({
-        skipErrorHandler: true,
-      });
-      return msg.data;
-    } catch (_error) {
-      history.push(loginPath);
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        return JSON.parse(storedUser);
+      }
+    } catch (error) {
+      console.error("Failed to get user from localStorage:", error);
     }
     return undefined;
   };
-  // 如果不是登录页面，执行
+
+  // If not login page, execute
   const { location } = history;
   if (
     ![loginPath, "/user/register", "/user/register-result"].includes(
@@ -40,6 +41,14 @@ export async function getInitialState(): Promise<{
     )
   ) {
     const currentUser = await fetchUserInfo();
+    if (!currentUser) {
+      // No user found, redirect to login
+      history.push(loginPath);
+      return {
+        fetchUserInfo,
+        settings: defaultSettings as Partial<LayoutSettings>,
+      };
+    }
     return {
       fetchUserInfo,
       currentUser,
